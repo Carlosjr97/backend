@@ -151,23 +151,23 @@ def enviar_planilha(email):
                 "Authorization": f"Bearer {RESEND_API_KEY}",
                 "Content-Type": "application/json"
             },
-            json={
-                "from": "Minha Jornada <onboarding@resend.dev>",
-                "to": [email],
-                "subject": "Sua planilha de treino 💪",
-                "text": (
-                    "Parabéns pela compra!\n\n"
-                    "Segue em anexo sua planilha de treino.\n\n"
-                    "Bons treinos 💪🔥"
-                ),
-                "attachments": [
-                    {
-                        "filename": "minhajornadamaisleve.xlsx",
-                        "content": arquivo_base64
-                    }
-                ]
-            }
-        )
+json={
+    "from": "Resend <onboarding@resend.dev>",
+    "to": [email],
+    "subject": "Sua planilha de treino 💪",
+    "text": (
+        "Parabéns pela compra!\n\n"
+        "Segue em anexo sua planilha de treino.\n\n"
+        "Bons treinos 💪🔥"
+    ),
+    "attachments": [
+        {
+            "filename": "minhajornadamaisleve.xlsx",
+            "content": arquivo_base64
+        }
+    ]
+}
+
 
         print("📨 Resposta Resend:", response.status_code, response.text)
 
@@ -194,3 +194,4 @@ def teste_email():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
+
