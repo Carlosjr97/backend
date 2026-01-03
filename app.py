@@ -54,7 +54,6 @@ def criar_pagamento():
         return jsonify({
             "payment_id": response["id"],
             "qr_code": transaction_data["qr_code"],
-            "qr_code_base64": transaction_data["qr_code_base64"]
         })
 
     except Exception as e:
@@ -68,3 +67,4 @@ def criar_pagamento():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
+
