@@ -175,3 +175,12 @@ def enviar_planilha(email):
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
+
+@app.route("/teste-email")
+def teste_email():
+    try:
+        enviar_planilha("SEU_EMAIL_PESSOAL@gmail.com")
+        return "Email enviado com sucesso", 200
+    except Exception as e:
+        return str(e), 500
+
