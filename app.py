@@ -78,9 +78,16 @@ def criar_pagamento():
 @app.route("/webhook", methods=["POST"])
 def webhook():
     data = request.json
-    payment_id = data.get("data", {}).get("id")
 
-    if not payment_id or payment_id not in pagamentos:
+    payment_id = (
+        data.get("data", {}).get("id")
+        or data.get("id")
+    )
+
+    if not payment_id:
+        return "ok", 200
+
+    if payment_id not in pagamentos:
         return "ok", 200
 
     pagamento = sdk.payment().get(payment_id)
@@ -137,4 +144,5 @@ def enviar_planilha(email):
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
+
 
