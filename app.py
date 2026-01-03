@@ -180,13 +180,7 @@ json={
         print("❌ ERRO AO ENVIAR E-MAIL:", str(e))
         raise
 
-# ===============================
-# ROTA DE TESTE (REMOVER EM PRODUÇÃO)
-# ===============================
-@app.route("/teste-email")
-def teste_email():
-    enviar_planilha("cbarbosa1009@gmail.com")
-    return "Email enviado com sucesso", 200
+
 
 # ===============================
 # START PARA RENDER
@@ -194,4 +188,5 @@ def teste_email():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
+
 
