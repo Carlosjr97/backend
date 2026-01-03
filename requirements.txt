@@ -1,5 +1,6 @@
 flask
 gunicorn
 requests
-python-dotenv
 mercadopago
+python-dotenv
+flask-cors
