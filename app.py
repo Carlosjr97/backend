@@ -3,24 +3,45 @@ from flask_cors import CORS
 import mercadopago
 import os
 import smtplib
+import json
 from email.message import EmailMessage
 from dotenv import load_dotenv
 
-# Carrega variáveis de ambiente
+# ===============================
+# CONFIGURAÇÃO INICIAL
+# ===============================
 load_dotenv()
 
 app = Flask(__name__)
 CORS(app)
 
-# Mercado Pago
 MP_ACCESS_TOKEN = os.getenv("MP_ACCESS_TOKEN")
+EMAIL_HOST = os.getenv("EMAIL_HOST")
+EMAIL_PORT = int(os.getenv("EMAIL_PORT", 587))
+EMAIL_USER = os.getenv("EMAIL_USER")
+EMAIL_PASS = os.getenv("EMAIL_PASS")
+
 if not MP_ACCESS_TOKEN:
     raise Exception("MP_ACCESS_TOKEN não encontrado")
 
 sdk = mercadopago.SDK(MP_ACCESS_TOKEN)
 
-# 🔹 Armazena pagamentos (simples para início)
-pagamentos = {}
+# ===============================
+# PERSISTÊNCIA SIMPLES (JSON)
+# ===============================
+ARQUIVO_PAGAMENTOS = "pagamentos.json"
+
+def carregar_pagamentos():
+    if not os.path.exists(ARQUIVO_PAGAMENTOS):
+        return {}
+    with open(ARQUIVO_PAGAMENTOS, "r") as f:
+        return json.load(f)
+
+def salvar_pagamentos(pagamentos):
+    with open(ARQUIVO_PAGAMENTOS, "w") as f:
+        json.dump(pagamentos, f)
+
+pagamentos = carregar_pagamentos()
 
 # ===============================
 # CRIAR PAGAMENTO PIX
@@ -54,11 +75,11 @@ def criar_pagamento():
         payment_id = response["id"]
         transaction_data = response["point_of_interaction"]["transaction_data"]
 
-        # 🔹 Salva pagamento
         pagamentos[payment_id] = {
             "email": email,
             "status": "pending"
         }
+        salvar_pagamentos(pagamentos)
 
         return jsonify({
             "payment_id": payment_id,
@@ -71,72 +92,82 @@ def criar_pagamento():
             "mensagem": str(e)
         }), 500
 
-
 # ===============================
 # WEBHOOK MERCADO PAGO
 # ===============================
 @app.route("/webhook", methods=["POST"])
 def webhook():
+    print("🔥 WEBHOOK RECEBIDO")
     data = request.json
+    print("📦 DADOS:", data)
 
     payment_id = (
         data.get("data", {}).get("id")
         or data.get("id")
     )
 
+    print("🆔 PAYMENT ID:", payment_id)
+
     if not payment_id:
         return "ok", 200
 
+    pagamentos = carregar_pagamentos()
+
     if payment_id not in pagamentos:
+        print("⚠️ Payment ID não encontrado")
         return "ok", 200
 
     pagamento = sdk.payment().get(payment_id)
     status = pagamento["response"]["status"]
 
+    print("📌 STATUS:", status)
+
     if status == "approved" and pagamentos[payment_id]["status"] != "approved":
         email = pagamentos[payment_id]["email"]
+        print("📧 ENVIANDO PLANILHA PARA:", email)
 
         enviar_planilha(email)
 
         pagamentos[payment_id]["status"] = "approved"
+        salvar_pagamentos(pagamentos)
 
     return "ok", 200
-
 
 # ===============================
 # ENVIO DE PLANILHA POR EMAIL
 # ===============================
 def enviar_planilha(email):
-    EMAIL_HOST = os.getenv("EMAIL_HOST")
-    EMAIL_PORT = int(os.getenv("EMAIL_PORT"))
-    EMAIL_USER = os.getenv("EMAIL_USER")
-    EMAIL_PASS = os.getenv("EMAIL_PASS")
+    try:
+        print("📧 Iniciando envio de e-mail para:", email)
 
-    msg = EmailMessage()
-    msg["Subject"] = "Sua planilha de treino 💪"
-    msg["From"] = EMAIL_USER
-    msg["To"] = email
+        msg = EmailMessage()
+        msg["Subject"] = "Sua planilha de treino 💪"
+        msg["From"] = EMAIL_USER
+        msg["To"] = email
 
-    msg.set_content(
-        "Parabéns pela compra!\n\n"
-        "Segue em anexo sua planilha de treino.\n\n"
-        "Bons treinos 💪🔥"
-    )
-
-    # ⚠️ A planilha deve estar no repositório
-    with open("minhajornadamaisleve.xlsx", "rb") as f:
-        msg.add_attachment(
-            f.read(),
-            maintype="application",
-            subtype="vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            filename="minhajornadamaisleve.xlsx"
+        msg.set_content(
+            "Parabéns pela compra!\n\n"
+            "Segue em anexo sua planilha de treino.\n\n"
+            "Bons treinos 💪🔥"
         )
 
-    with smtplib.SMTP(EMAIL_HOST, EMAIL_PORT) as server:
-        server.starttls()
-        server.login(EMAIL_USER, EMAIL_PASS)
-        server.send_message(msg)
+        with open("minhajornadamaisleve.xlsx", "rb") as f:
+            msg.add_attachment(
+                f.read(),
+                maintype="application",
+                subtype="vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                filename="minhajornadamaisleve.xlsx"
+            )
 
+        with smtplib.SMTP(EMAIL_HOST, EMAIL_PORT) as server:
+            server.starttls()
+            server.login(EMAIL_USER, EMAIL_PASS)
+            server.send_message(msg)
+
+        print("✅ E-mail enviado com sucesso!")
+
+    except Exception as e:
+        print("❌ ERRO AO ENVIAR E-MAIL:", str(e))
 
 # ===============================
 # START PARA RENDER
@@ -144,5 +175,3 @@ def enviar_planilha(email):
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
-
-
