@@ -179,8 +179,9 @@ if __name__ == "__main__":
 @app.route("/teste-email")
 def teste_email():
     try:
-        enviar_planilha("SEU_EMAIL_PESSOAL@gmail.com")
+        enviar_planilha("cbarbosa1009@gmail.com")
         return "Email enviado com sucesso", 200
     except Exception as e:
         return str(e), 500
+
 
