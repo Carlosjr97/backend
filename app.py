@@ -2,9 +2,9 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 import mercadopago
 import os
-import smtplib
 import json
-from email.message import EmailMessage
+import requests
+import base64
 from dotenv import load_dotenv
 
 # ===============================
@@ -16,13 +16,13 @@ app = Flask(__name__)
 CORS(app)
 
 MP_ACCESS_TOKEN = os.getenv("MP_ACCESS_TOKEN")
-EMAIL_HOST = os.getenv("EMAIL_HOST")
-EMAIL_PORT = int(os.getenv("EMAIL_PORT", 587))
-EMAIL_USER = os.getenv("EMAIL_USER")
-EMAIL_PASS = os.getenv("EMAIL_PASS")
+RESEND_API_KEY = os.getenv("RESEND_API_KEY")
 
 if not MP_ACCESS_TOKEN:
     raise Exception("MP_ACCESS_TOKEN não encontrado")
+
+if not RESEND_API_KEY:
+    raise Exception("RESEND_API_KEY não encontrado")
 
 sdk = mercadopago.SDK(MP_ACCESS_TOKEN)
 
@@ -40,8 +40,6 @@ def carregar_pagamentos():
 def salvar_pagamentos(pagamentos):
     with open(ARQUIVO_PAGAMENTOS, "w") as f:
         json.dump(pagamentos, f)
-
-pagamentos = carregar_pagamentos()
 
 # ===============================
 # CRIAR PAGAMENTO PIX
@@ -75,6 +73,7 @@ def criar_pagamento():
         payment_id = response["id"]
         transaction_data = response["point_of_interaction"]["transaction_data"]
 
+        pagamentos = carregar_pagamentos()
         pagamentos[payment_id] = {
             "email": email,
             "status": "pending"
@@ -134,40 +133,60 @@ def webhook():
     return "ok", 200
 
 # ===============================
-# ENVIO DE PLANILHA POR EMAIL
+# ENVIO DE PLANILHA POR EMAIL (RESEND)
 # ===============================
 def enviar_planilha(email):
     try:
-        print("📧 Iniciando envio de e-mail para:", email)
+        print("📧 Enviando planilha via Resend para:", email)
 
-        msg = EmailMessage()
-        msg["Subject"] = "Sua planilha de treino 💪"
-        msg["From"] = EMAIL_USER
-        msg["To"] = email
+        BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+        arquivo_path = os.path.join(BASE_DIR, "minhajornadamaisleve.xlsx")
 
-        msg.set_content(
-            "Parabéns pela compra!\n\n"
-            "Segue em anexo sua planilha de treino.\n\n"
-            "Bons treinos 💪🔥"
+        with open(arquivo_path, "rb") as f:
+            arquivo_base64 = base64.b64encode(f.read()).decode("utf-8")
+
+        response = requests.post(
+            "https://api.resend.com/emails",
+            headers={
+                "Authorization": f"Bearer {RESEND_API_KEY}",
+                "Content-Type": "application/json"
+            },
+            json={
+                "from": "Minha Jornada <onboarding@resend.dev>",
+                "to": [email],
+                "subject": "Sua planilha de treino 💪",
+                "text": (
+                    "Parabéns pela compra!\n\n"
+                    "Segue em anexo sua planilha de treino.\n\n"
+                    "Bons treinos 💪🔥"
+                ),
+                "attachments": [
+                    {
+                        "filename": "minhajornadamaisleve.xlsx",
+                        "content": arquivo_base64
+                    }
+                ]
+            }
         )
 
-        with open("minhajornadamaisleve.xlsx", "rb") as f:
-            msg.add_attachment(
-                f.read(),
-                maintype="application",
-                subtype="vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                filename="minhajornadamaisleve.xlsx"
-            )
+        print("📨 Resposta Resend:", response.status_code, response.text)
 
-        with smtplib.SMTP(EMAIL_HOST, EMAIL_PORT) as server:
-            server.starttls()
-            server.login(EMAIL_USER, EMAIL_PASS)
-            server.send_message(msg)
+        if response.status_code >= 300:
+            raise Exception("Erro ao enviar e-mail via Resend")
 
-        print("✅ E-mail enviado com sucesso!")
+        print("✅ E-mail enviado com sucesso via Resend!")
 
     except Exception as e:
         print("❌ ERRO AO ENVIAR E-MAIL:", str(e))
+        raise
+
+# ===============================
+# ROTA DE TESTE (REMOVER EM PRODUÇÃO)
+# ===============================
+@app.route("/teste-email")
+def teste_email():
+    enviar_planilha("cbarbosa1009@gmail.com")
+    return "Email enviado com sucesso", 200
 
 # ===============================
 # START PARA RENDER
@@ -175,13 +194,3 @@ def enviar_planilha(email):
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
-
-@app.route("/teste-email")
-def teste_email():
-    try:
-        enviar_planilha("cbarbosa1009@gmail.com")
-        return "Email enviado com sucesso", 200
-    except Exception as e:
-        return str(e), 500
-
-
