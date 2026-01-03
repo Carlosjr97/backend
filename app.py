@@ -121,7 +121,7 @@ def enviar_planilha(email):
         msg.add_attachment(
             f.read(),
             maintype="application",
-            subtype="pdf",
+            subtype="vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             filename="minhajornadamaisleve.xlsx"
         )
 
@@ -137,3 +137,4 @@ def enviar_planilha(email):
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
+
